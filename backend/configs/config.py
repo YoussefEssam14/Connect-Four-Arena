@@ -1,0 +1,6 @@
+ROWS = 6
+COLS = 7
+H = 7
+CELLS = ROWS * COLS
+MOVE_ORDER = [3,2,4,1,5,0,6]
+DIRECTIONS = [(1,0),(0,1),(1,1),(-1,1)]
