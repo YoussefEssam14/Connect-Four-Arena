@@ -1,0 +1,17 @@
+ROWS = 6
+COLS = 7
+H = 7
+CELLS = ROWS * COLS
+COLUMN_ORDER = [3, 2, 4, 1, 5, 0, 6]
+DIRECTIONS = [(1, 0), (0, 1), (1, 1), (-1, 1)]
+DEFAULT_K = 3
+DS = [1 , H , H+1 , H-1]
+WIN = 1_000_000
+A = 1000
+TWO = 10
+THREE = 100
+THREE_BURIED = 0.5
+PARITY_BONUS = 60
+TEMPO_BONUS = 300
+LAMBDA = 1
+COL_WEIGHT = [3, 4, 5, 7, 5, 4, 3]
