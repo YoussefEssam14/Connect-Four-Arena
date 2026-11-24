@@ -1,59 +1,42 @@
-# Frontend
+# Connect Four Frontend — Death Note Edition
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 22.2.2.
+A React 18 + TypeScript 5.7 + Vite 6 frontend for Alexandria Connect Four, featuring an interactive Minimax search tree visualizer and a Death Note anime-inspired interface.
 
-## Development server
+---
 
-To start a local development server, run:
-
-```bash
-ng serve
-```
-
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
-
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
+## Running Locally
 
 ```bash
-ng generate component component-name
+# Install dependencies
+npm install
+
+# Start the Vite development server on port 3000
+npm run dev
+# Or: npm start
 ```
 
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
+The frontend runs on **`http://localhost:3000`** and proxies `/game` requests to `http://localhost:8000`.
+
+---
+
+## Features
+
+- **Setup Screen**: Select player character (Red / Light Yagami or Yellow / L Lawliet) and search depth from $k=1$ to $k=9$.
+- **Match View**: Drop discs with column guides, live ghost previews, turn indicators, scores, and search telemetry (nodes, leaves, cutoffs, time).
+- **Interactive Minimax Decision Tree**:
+  - Scrollable (both X and Y) and pannable (click and drag to move canvas).
+  - Zoom controls (In, Out, Center, Reset).
+  - Expand/collapse branch toggles and "Expand All" / "Collapse All" controls.
+  - Depth selector dynamically bounded up to `MAX_SEARCH_DEPTH = 9`.
+  - Max / Min color distinctions, gold glowing best-move connectors, and dashed pruned-branch cutoffs.
+- **Winning Lines & Animations**: Completed four-in-a-row connections pulsate dynamically on the board.
+- **Responsive Layout**: Designed for desktop, tablet, and mobile screens.
+
+---
+
+## Production Build
 
 ```bash
-ng generate --help
+npm run build
 ```
-
-## Building
-
-To build the project run:
-
-```bash
-ng build
-```
-
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
-
-## Running unit tests
-
-To execute unit tests with the [Vitest](https://vitest.dev/) test runner, use the following command:
-
-```bash
-ng test
-```
-
-## Running end-to-end tests
-
-For end-to-end (e2e) testing, run:
-
-```bash
-ng e2e
-```
-
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
-
-## Additional Resources
-
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+Runs TypeScript verification (`tsc -b`) and Vite production bundling into `dist/`.
