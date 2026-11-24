@@ -1,6 +1,6 @@
 from models.board import Board
 from models.color import Color
-from models.tree_node import TreeNode, tree_to_dict
+from models.tree_node import TreeNode, tree_to_dict, INF
 from models.stats import Stats
 from ai.algorithms.alpha_beta import best_move
 from ai.heurisitcs.build_windows import WINDOWS
@@ -42,6 +42,8 @@ class GameService:
         self.last_stats: Stats | None = None
         self.last_tree: TreeNode | None = None
         self.last_ai_column: int | None = None
+        self.history: list[dict] = []
+        self._record_initial()
 
         if not self.is_human_turn:
             self._run_ai()
@@ -54,6 +56,37 @@ class GameService:
     def game_over(self) -> bool:
         return self.board.full
 
+    def _record_initial(self) -> None:
+        self.history.append({
+            "ply": 0,
+            "actor": "initial",
+            "color": None,
+            "column": None,
+            "grid": self.board.to_grid(),
+            "human_score": 0,
+            "ai_score": 0,
+            "evidence": None,
+        })
+
+    def _record_ply(
+        self,
+        actor: str,
+        color: Color,
+        column: int,
+        evidence: dict | None = None,
+    ) -> None:
+        human_score, ai_score = self.scores()
+        self.history.append({
+            "ply": len(self.history),
+            "actor": actor,
+            "color": color,
+            "column": column,
+            "grid": self.board.to_grid(),
+            "human_score": human_score,
+            "ai_score": ai_score,
+            "evidence": evidence,
+        })
+
     def human_move(self, column: int) -> "GameService":
         if self.game_over:
             raise GameOverException("Game is already over")
@@ -62,6 +95,7 @@ class GameService:
 
         self.board.make_move(column)
         self.last_ai_column = None
+        self._record_ply(actor="human", color=self.human_color, column=column, evidence=None)
 
         if not self.game_over and not self.is_human_turn:
             self._run_ai()
@@ -69,11 +103,26 @@ class GameService:
         return self
 
     def _run_ai(self) -> None:
+        def serialize_bound(x: float | None) -> float | str | None:
+            if x is None:
+                return None
+            return str(x) if x in (INF, -INF) else x
+
         col, tree, stats = best_move(self.board, self.k, self.ai_idx)
         self.last_tree = tree
         self.last_stats = stats
         self.last_ai_column = col
         self.board.make_move(col)
+        evidence = {
+            "role": tree.kind,
+            "value": serialize_bound(tree.value),
+            "alpha": serialize_bound(tree.alpha),
+            "beta": serialize_bound(tree.beta),
+            "best_move": tree.best_move,
+            "pruned": stats.cutoffs > 0,
+            "cutoffs": stats.cutoffs,
+        }
+        self._record_ply(actor="ai", color=self.ai_color, column=col, evidence=evidence)
 
     def winner(self) -> str | None:
         if not self.game_over:
@@ -114,6 +163,7 @@ class GameService:
             "is_human_turn": self.is_human_turn,
             "ai_column": self.last_ai_column,
             "stats": stats_dict,
+            "history": self.history,
         }
 
     def tree(self, max_depth: int | None = None) -> dict | None:
