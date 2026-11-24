@@ -12,7 +12,7 @@ _COL_MASKS = [
 ]
 
 
-def evaluate(board: Board, maximizer: int) -> tuple[float, dict]:
+def evaluate(board: Board, maximizer: int, include_info: bool = True) -> tuple[float, dict]:
     me, opp = maximizer, 1 - maximizer
     mine, theirs = board.bb[me], board.bb[opp]
     occupied = mine | theirs
@@ -74,21 +74,24 @@ def evaluate(board: Board, maximizer: int) -> tuple[float, dict]:
     )
     score += LAMBDA * positional
 
-    info = {
-        "fours_me": fours[me],
-        "fours_opp": fours[opp],
-        "threes_me": threes[me],
-        "threes_opp": threes[opp],
-        "twos_me": twos[me],
-        "twos_opp": twos[opp],
-        "positional": positional,
-        "score": score,
-    }
-
     if board.full:
         diff = fours[me] - fours[opp]
         score = WIN if diff > 0 else -WIN if diff < 0 else 0.0
-        info["score"] = score
-        info["terminal"] = True
+
+    info = (
+        {
+            "fours_me": fours[me],
+            "fours_opp": fours[opp],
+            "threes_me": threes[me],
+            "threes_opp": threes[opp],
+            "twos_me": twos[me],
+            "twos_opp": twos[opp],
+            "positional": positional,
+            "score": score,
+            **({"terminal": True} if board.full else {}),
+        }
+        if include_info
+        else {}
+    )
 
     return score, info

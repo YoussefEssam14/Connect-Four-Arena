@@ -3,6 +3,7 @@ Connect Four API endpoints
 """
 from fastapi import APIRouter, HTTPException, Query
 
+from configs.settings import MAX_SEARCH_DEPTH
 from dtos.schemas import NewGameRequest, MoveRequest, GameState
 from services.game_service import new_game, get_game
 from exceptions.exception import (
@@ -61,7 +62,7 @@ def get_state():
 
 
 @router.get("/tree", summary="Last AI minimax tree")
-def get_tree(max_depth: int = Query(2, ge=0, le=6)):
+def get_tree(max_depth: int = Query(2, ge=0, le=MAX_SEARCH_DEPTH)):
     """
     Retrieve the minimax tree from the last AI move.
     
