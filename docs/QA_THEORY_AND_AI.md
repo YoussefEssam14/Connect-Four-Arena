@@ -235,3 +235,85 @@ In `GameService.__init__`:
 - `Board(symbols=["R", "Y"])` assigns index `0` to `'R'` and index `1` to `'Y'`.
 - `player_to_move` is `self.moves & 1`, so `'R'` always moves on even plies (starting at ply 0) and `'Y'` always moves on odd plies.
 - If the human chooses `'Y'` (`human_idx = 1`, `ai_idx = 0`), `is_human_turn` is initially `False`, so `GameService.__init__` immediately calls `self._run_ai()` for `'R'`'s opening move (recorded as `ply: 1` right after `ply: 0`).
+
+---
+
+## 7. Additional Theoretical, Edge-Case & Assignment Questions
+
+### Q18: Why is the full Connect Four game tree $O(10^{35})$ and why is depth-limited heuristic pruning (`k`) required?
+With 7 columns and 42 total plies, a naive upper bound on the game tree size is $b^d \approx 7^{42} \approx 3.1 \times 10^{35}$ states (with roughly $4.5 \times 10^{12}$ unique reachable board positions). Even with fast bitboard operations at ~150,000 nodes/second, traversing to terminal states from the opening move would take longer than the age of the universe.
+
+Truncating the search at depth `k` and applying `evaluate(board, maximizer)` at the frontier reduces the worst-case time complexity from $O(b^{42})$ to $O(b^k)$ — and with Alpha-Beta pruning and good move ordering, closer to $O(b^{k/2})$ in the best case.
+
+---
+
+### Q19: How does `evaluate()` guarantee that larger values favor the AI and smaller values favor the human?
+In `backend/ai/heurisitcs/evaluate.py`, `maximizer` is always passed as `self.ai_idx` (`0` if AI is Red, `1` if AI is Yellow):
+- `me, opp = maximizer, 1 - maximizer`
+- Every window owned by `me` (AI) gets `sign = +1`.
+- Every window owned by `opp` (Human) gets `sign = -1`.
+- Positional column control is computed as `(mine & _COL_MASKS[c]).bit_count() - (theirs & _COL_MASKS[c]).bit_count()`.
+- At a full board (`board.full`), `diff = fours[me] - fours[opp]` returns `+WIN` (`+1,000,000`) when AI has more fours, `-WIN` (`-1,000,000`) when Human has more fours, and `0.0` on a draw.
+
+Thus, the heuristic is strictly zero-sum from the AI's perspective: larger positive scores mean the AI is ahead, and smaller (more negative) scores mean the human is ahead.
+
+---
+
+### Q20: Why does `_alpha_beta` use `alpha >= beta` instead of `alpha > beta`?
+When `alpha == beta`, the maximizer already has a guaranteed alternative of score `alpha`, and the minimizer can already hold the current branch to at most `beta = alpha`. Even if the remaining sibling moves in this branch could somehow improve the minimizer's score further (making it `< alpha`), the maximizer will never choose this branch over the `alpha` branch it already found. Conversely, if a sibling doesn't improve it, it is at best `alpha`, which only ties the existing option. Pruning on `alpha >= beta` ("fail-hard / fail-soft" standard cutoff) eliminates redundant tie-exploration without changing the minimax value.
+
+---
+
+### Q21: How are ties between equally scored columns broken?
+In `_alpha_beta` (`backend/ai/algorithms/alpha_beta.py`):
+- `moves = board.valid_moves(COLUMN_ORDER)` orders candidate moves as `[3, 2, 4, 1, 5, 0, 6]`.
+- `best_move_col = moves[0]` initializes the choice to the first valid move in center-first order.
+- Updates use strict inequality: `if v > best:` (MAX) and `if v < best:` (MIN).
+
+Because strict `>` / `<` only replaces `best_move_col` on a strictly better score, ties automatically resolve in favor of the **most central** column in `COLUMN_ORDER`, which is strategically stronger in Connect Four.
+
+---
+
+### Q22: What is the "horizon effect" at depth `k`, and how do odd vs. even `k` values differ?
+Depth-limited search cannot see threats or forced sequences beyond `k` plies (the "horizon"):
+- **Odd `k` (e.g. `k = 1, 3, 5`)**: The leaf nodes are evaluated right after a **MAX (AI)** move, meaning `to_move` at the leaf is the **opponent (MIN)**. If the AI leaves an immediate threat, the opponent's reply is just beyond the horizon (partially mitigated by `TEMPO_BONUS` checking `to_move == owner`).
+- **Even `k` (e.g. `k = 2, 4, 6`)**: The leaf nodes are evaluated right after a **MIN (Human)** move, so `to_move` at the leaf is **MAX (AI)**.
+
+Higher `k` pushes the horizon further away so tactical traps and multi-move combinations are resolved inside the search tree rather than approximated by the heuristic.
+
+---
+
+### Q23: Why does `evaluate()` have an `include_info: bool = True` flag?
+Building the diagnostic `info` dictionary (`fours_me`, `fours_opp`, `threes_me`, `threes_opp`, `twos_me`, `twos_opp`, `positional`, `score`) allocates a Python `dict` on every call. During Alpha-Beta search (`_alpha_beta`), `evaluate()` is called at every leaf node (potentially tens of thousands of times per move), so passing `include_info=False` avoids unnecessary dictionary allocations in the hot path while keeping detailed breakdowns available for debugging, tests, and inspection.
+
+---
+
+### Q24: Why does `best_move()` default `max_record_depth = k`?
+Originally `max_record_depth` defaulted to `4`, which meant searches at `k = 5..9` still computed the full tree but truncated the recorded `TreeNode` children below depth 4. Setting `max_record_depth = k` when `None` ensures the recorded tree matches the full search depth `k`, while the API endpoint `/game/tree?max_depth=...` lets callers request a smaller slice (from `0` up to `MAX_SEARCH_DEPTH = 9`) without re-running the search.
+
+---
+
+### Q25: What is the space complexity of Alpha-Beta Minimax in this implementation?
+The search recursion stack itself uses **$O(k)$** space:
+- Because `Board.make_move(col)` and `Board.undo(col)` mutate a single `Board` instance in place, **zero** board copies are allocated during search.
+- When `TreeNode` recording is enabled up to `max_record_depth = k`, memory is proportional to the number of visited nodes $O(N_{\text{visited}})$ (typically a few hundred KB to a few MB depending on `k`).
+
+---
+
+### Q26: Why were transposition tables or iterative deepening not used for `k <= 9`?
+- With a 64-bit bitboard + `COLUMN_ORDER` pruning ~96.8% of nodes at `k = 5`, searches up to `k = 7` finish in under ~80 ms in pure Python without needing a Zobrist hash table or time-budgeted iterative deepening.
+- For `k >= 10` or strict wall-clock time limits, adding **iterative deepening** (using the previous depth's best move first) and a **Zobrist transposition table** (caching `(bb[0], bb[1], depth)` evaluations) would be the natural next optimization.
+
+---
+
+### Q27: What happens in the endgame when fewer than `k` empty cells remain?
+In `_alpha_beta`:
+`if depth == 0 or not moves:`
+When `board.full` becomes `True` (`moves == []`) before `depth` reaches `0`, the search hits the exact terminal state and `evaluate()` enters `if board.full:`, returning `WIN` (`+1,000,000`), `-WIN` (`-1,000,000`), or `0.0`. Thus, in the final `k` plies of the match, Alpha-Beta solves the endgame **exactly** with zero heuristic approximation.
+
+---
+
+### Q28: Why does the backend define explicit domain exceptions (`FullColumnException`, `OutOfBoundsException`, `GameOverException`, `NotCurrentPlayerMoveException`, `NoActiveGameException`)?
+Separating domain errors (`backend/exceptions/exception.py`) from HTTP handling (`backend/apis/api.py`) keeps `Board` and `GameService` framework-agnostic:
+- `Board` and `GameService` can be unit-tested or driven from a CLI without FastAPI.
+- The API layer maps `_CLIENT_ERRORS` uniformly in `_guard()` to HTTP `400 Bad Request` with clear error messages, while keeping Pydantic schema validation errors (e.g. `column: 99`) as HTTP `422 Unprocessable Entity`.
