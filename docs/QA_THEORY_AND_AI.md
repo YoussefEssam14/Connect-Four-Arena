@@ -317,3 +317,76 @@ When `board.full` becomes `True` (`moves == []`) before `depth` reaches `0`, the
 Separating domain errors (`backend/exceptions/exception.py`) from HTTP handling (`backend/apis/api.py`) keeps `Board` and `GameService` framework-agnostic:
 - `Board` and `GameService` can be unit-tested or driven from a CLI without FastAPI.
 - The API layer maps `_CLIENT_ERRORS` uniformly in `_guard()` to HTTP `400 Bad Request` with clear error messages, while keeping Pydantic schema validation errors (e.g. `column: 99`) as HTTP `422 Unprocessable Entity`.
+
+---
+
+## 8. Deep-Dive Algorithm & Heuristic Questions
+
+### Q29: Why does `_alpha_beta` determine `maximizing` via `board.player_to_move == maximizer` instead of passing a boolean flag?
+`Board.player_to_move` is already maintained in $O(1)$ as `self.moves & 1` (`0` on even plies, `1` on odd plies) and automatically flips on every `make_move(col)` and `undo(col)`. Deriving `maximizing = board.player_to_move == maximizer` from the board itself guarantees the search role can never drift out of sync with the board state.
+
+---
+
+### Q30: What is the difference between a beta cutoff and an alpha cutoff?
+Both are triggered by the same condition `if alpha >= beta: break`, but they happen at opposite node types:
+- **Beta cutoff (at a MAX node)**: MAX finds a move whose value `v >= beta`. Since the parent MIN node already has an alternative with score `beta`, MIN will never allow MAX to reach this node — so MAX stops checking remaining siblings.
+- **Alpha cutoff (at a MIN node)**: MIN finds a move whose value `v <= alpha`. Since the parent MAX node already has an alternative with score `alpha`, MAX will never enter this branch — so MIN stops checking remaining siblings.
+
+---
+
+### Q31: Why does MAX only update `alpha` and MIN only update `beta`?
+- `alpha` represents the **best guaranteed lower bound for MAX** along the current path. Only MAX chooses moves that raise its minimum guarantee (`alpha = max(alpha, best)`).
+- `beta` represents the **best guaranteed upper bound for MIN** along the current path. Only MIN chooses moves that lower its maximum concession (`beta = min(beta, best)`).
+
+Updating `beta` inside a MAX node or `alpha` inside a MIN node would corrupt the opponent's guarantee and cause unsound pruning.
+
+---
+
+### Q32: Can Alpha-Beta pruning ever change the optimal move or minimax value compared to full Minimax?
+No. Assuming a deterministic evaluation function and identical tie-breaking order (`COLUMN_ORDER`), Alpha-Beta pruning is **mathematically equivalent** to full Minimax: every pruned subtree is provably unable to influence the root's minimax value. Only the number of visited nodes and runtime change.
+
+---
+
+### Q33: Why does `k = 1` have `0` cutoffs (`0.00%` pruned) in the benchmark?
+A cutoff requires at least **two plies** of interaction: a parent bound established by an earlier sibling, and a child node comparing its own children against that parent bound. At `k = 1`, the root simply evaluates all 7 immediate leaf boards directly — there are no deeper grandchildren to prune, so Minimax and Alpha-Beta both visit the exact same `8` nodes (1 root + 7 leaves).
+
+---
+
+### Q34: Why does `evaluate()` ignore windows with `k == 1` (1 friendly disc and 3 empty cells)?
+A window with 1 disc and 3 empty cells is too weak and noisy to indicate a real threat — almost any disc on the board participates in several 1-of-4 windows. Instead of scoring `k == 1` per window, `evaluate()` captures early-game disc placement cleanly and faster via the `COL_WEIGHT = [3, 4, 6, 9, 6, 4, 3]` positional term.
+
+---
+
+### Q35: Why is `A = 1000` (completed 4-in-a-row) much larger than `THREE + TEMPO_BONUS = 540` and `TWO = 12`?
+This strict weight hierarchy enforces tactical priority:
+- **Completed 4 (`1000`) > Immediate 3-with-tempo (`540`) > Uncontested 3 (`120`) > Buried 3 (`57.6`, or `137.6` with parity) > Open 2 (`12`) > Column weight (`3..9`)**.
+- Without `A >> THREE + TEMPO_BONUS`, the AI could mistakenly trade away an already-completed 4-in-a-row (or miss taking one) in favor of setting up two speculative 3-in-a-row threats.
+
+---
+
+### Q36: How does `evaluate()` find the exact missing cell of a 3-in-a-row in $O(1)$?
+When `k == 3` in a 4-cell `window`:
+1. `empty_bit = window & ~occupied` isolates the single bit that is `1` in `window` and `0` in `occupied` (since 3 of the 4 bits are occupied).
+2. `idx = empty_bit.bit_length() - 1` converts that power-of-two bitmask directly to its integer bit index.
+3. `c, r = divmod(idx, H)` recovers the exact column `c` and row `r` (because bit index = `c * H + r`), allowing `dist = r - board.heights[c]` to check whether the threat is immediately playable (`dist == 0`) or buried (`dist > 0`).
+
+---
+
+### Q37: Why is `if board.full:` checked at the end of `evaluate()` rather than at the top?
+`fours[me]` and `fours[opp]` are already accumulated during the single pass over the 69 `WINDOWS` (`if k == 4: fours[owner] += 1`). Checking `if board.full:` right after the loop reuses those exact `fours` counts to compute `diff = fours[me] - fours[opp]` and return `WIN`, `-WIN`, or `0.0` without running `_count_fours()` a second time.
+
+---
+
+### Q38: What is the purpose of `LAMBDA = 1` in `score += LAMBDA * positional`?
+`LAMBDA` is the global scaling factor between **tactical window threats** (`A`, `THREE`, `TWO`) and **positional column control** (`COL_WEIGHT`). Keeping `LAMBDA` as an explicit parameter in `settings.py` lets you dial positional gravity up or down relative to tactical threats during tuning without rewriting `COL_WEIGHT`.
+
+---
+
+### Q39: Why can a single disc be counted in multiple `WINDOWS` in `evaluate()`?
+That is intentional: in Connect Four (and especially in Alexandria Connect Four where all 4-in-a-rows are scored), a central disc that simultaneously participates in a horizontal, vertical, and two diagonal 3-in-a-row threats creates **forks** (double threats) that cannot all be blocked in a single turn. Scoring each of the 69 windows independently naturally rewards multi-directional forks.
+
+---
+
+### Q40: What happens when `board.full` is tied (`fours[me] == fours[opp]`) vs. when an intermediate leaf has `score == 0.0`?
+- At `board.full` with `fours[me] == fours[opp]`, `evaluate()` returns `0.0` (exact game-theoretic draw — neither `WIN` nor `-WIN`), ignoring positional `COL_WEIGHT` because positional advantage no longer matters once no moves remain.
+- At a non-terminal leaf (`depth == 0` with empty cells remaining), `score == 0.0` simply means the AI's and human's heuristic threats and positional weights currently balance out.
