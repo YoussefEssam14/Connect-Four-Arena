@@ -19,17 +19,21 @@ class TreeNode:
     children: list["TreeNode"] = field(default_factory=list)
 
 
-def tree_to_dict(node: TreeNode, max_depth: int | None = None) -> dict:
-    def serialize(x: float) -> float | str:
-        return str(x) if x in (INF, -INF) else x
+def serialize_bound(x: float | None) -> float | str | None:
+    """Serialize infinite minimax bounds as strings for JSON responses."""
+    if x is None:
+        return None
+    return str(x) if x in (INF, -INF) else x
 
+
+def tree_to_dict(node: TreeNode, max_depth: int | None = None) -> dict:
     return {
         "move": node.move,
         "kind": node.kind,
         "depth": node.depth,
-        "alpha": serialize(node.alpha),
-        "beta": serialize(node.beta),
-        "value": serialize(node.value),
+        "alpha": serialize_bound(node.alpha),
+        "beta": serialize_bound(node.beta),
+        "value": serialize_bound(node.value),
         "pruned": node.pruned,
         "is_leaf": node.is_leaf,
         "heuristic": node.heuristic,

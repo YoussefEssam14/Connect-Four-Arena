@@ -1,11 +1,11 @@
 from typing import Literal
-from configs.settings import COLS, DEFAULT_K
+from configs.settings import COLS, DEFAULT_K, MAX_SEARCH_DEPTH
 from pydantic import BaseModel, Field
 from models.color import Color
 
 
 class NewGameRequest(BaseModel):
-    k: int = Field(DEFAULT_K, ge=1, le=9, description="Alpha-beta search depth")
+    k: int = Field(DEFAULT_K, ge=1, le=MAX_SEARCH_DEPTH, description="Alpha-beta search depth")
     human_color: Color = "R"
 
 

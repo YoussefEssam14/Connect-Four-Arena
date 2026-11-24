@@ -1,11 +1,9 @@
 import time
 from configs.settings import COLUMN_ORDER
 from models.board import Board
-from models.tree_node import TreeNode
+from models.tree_node import INF, TreeNode
 from models.stats import Stats
 from ai.heurisitcs.evaluate import evaluate
-
-INF = float("inf")
 
 
 def _alpha_beta(
@@ -80,7 +78,7 @@ def best_move(
     k: int,
     maximizer: int,
     max_record_depth: int | None = None,
-) -> tuple[int, TreeNode, Stats]:
+) -> tuple[int | None, TreeNode, Stats]:
     root_kind = "MAX" if board.player_to_move == maximizer else "MIN"
     root = TreeNode(depth=0, move=None, kind=root_kind)
     stats = Stats()

@@ -1,24 +1,14 @@
 from models.board import Board
 from models.color import Color
-from models.tree_node import TreeNode, tree_to_dict, INF
+from models.tree_node import TreeNode, serialize_bound, tree_to_dict
 from models.stats import Stats
 from ai.algorithms.alpha_beta import best_move
-from ai.heurisitcs.build_windows import WINDOWS
-from configs.settings import DEFAULT_K, COLUMN_ORDER , DS
+from configs.settings import DEFAULT_K
 from exceptions.exception import (
     NotCurrentPlayerMoveException,
     NoActiveGameException,
     GameOverException,
 )
-from utils.popcount import popcount
-
-def _count_fours(bb: int) -> int:
-    count = 0
-    for d in DS:
-        pairs = bb & (bb >> d)
-        fours = pairs & (pairs >> (d << 1))
-        count += popcount(fours)
-    return count
 
 
 
@@ -103,15 +93,12 @@ class GameService:
         return self
 
     def _run_ai(self) -> None:
-        def serialize_bound(x: float | None) -> float | str | None:
-            if x is None:
-                return None
-            return str(x) if x in (INF, -INF) else x
-
         col, tree, stats = best_move(self.board, self.k, self.ai_idx)
         self.last_tree = tree
         self.last_stats = stats
         self.last_ai_column = col
+        if col is None:
+            return
         self.board.make_move(col)
         evidence = {
             "role": tree.kind,
@@ -127,8 +114,7 @@ class GameService:
     def winner(self) -> str | None:
         if not self.game_over:
             return None
-        my_fours = _count_fours(self.board.bb[self.human_idx])
-        ai_fours = _count_fours(self.board.bb[self.ai_idx])
+        my_fours, ai_fours = self.scores()
         if my_fours > ai_fours:
             return self.human_color
         if ai_fours > my_fours:
@@ -137,8 +123,8 @@ class GameService:
 
     def scores(self) -> tuple[int, int]:
         return (
-            _count_fours(self.board.bb[self.human_idx]),
-            _count_fours(self.board.bb[self.ai_idx]),
+            self.board.count_fours(self.human_idx),
+            self.board.count_fours(self.ai_idx),
         )
 
     def state(self) -> dict:

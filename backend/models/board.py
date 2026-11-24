@@ -1,4 +1,4 @@
-from configs.settings import ROWS, COLS, H, CELLS
+from configs.settings import ROWS, COLS, H, CELLS, DS
 from exceptions.exception import (
     OutOfBoundsException,
     GameOverException,
@@ -8,8 +8,8 @@ from exceptions.exception import (
 
 
 class Board:
-    def __init__(self, symbols: list[str] = ["R", "Y"]):
-        self.symbols = symbols
+    def __init__(self, symbols: list[str] | None = None):
+        self.symbols = list(symbols) if symbols is not None else ["R", "Y"]
         self.bb = [0, 0]
         self.moves = 0
         self.heights = [0] * COLS
@@ -60,3 +60,13 @@ class Board:
 
     def valid_moves(self, order: list[int]) -> list[int]:
         return [c for c in order if self.can_play(c)]
+
+    def count_fours(self, player: int) -> int:
+        """Count all 4-in-a-row bitboard segments for the given player index."""
+        bb = self.bb[player]
+        count = 0
+        for d in DS:
+            pairs = bb & (bb >> d)
+            fours = pairs & (pairs >> (d << 1))
+            count += fours.bit_count()
+        return count

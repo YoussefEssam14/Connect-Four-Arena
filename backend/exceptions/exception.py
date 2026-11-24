@@ -21,7 +21,3 @@ class InvalidUndoException(RuntimeError):
 class NoActiveGameException(RuntimeError):
     """Raised when trying to access game state with no active game."""
     pass
-
-
-class NoActiveGameException(RuntimeError):
-    pass
