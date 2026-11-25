@@ -1,174 +1,232 @@
 import sys
 import os
 import time
-import tracemalloc
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+sys.path.insert(0, os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..")
+))
+
 
 from models.board import Board
-from models.stats import Stats
-from configs.settings import (
-    ROWS, COLS, H, CELLS, WIN, COLUMN_ORDER
-)
-from ai.algorithms.alpha_beta import best_move, _alpha_beta
-from ai.heurisitcs.evaluate import evaluate
-from utils.popcount import popcount
-from configs.settings import DS
+from configs.settings import COLUMN_ORDER, CELLS
+from ai.algorithms.alpha_beta import best_move
 
-INF = float("inf")
-
-
-def count_fours(bb: int) -> int:
-    count = 0
-    for d in DS:
-        pairs = bb & (bb >> d)
-        fours = pairs & (pairs >> (d << 1))
-        count += popcount(fours)
-    return count
-
-
-def stress_test_full_game_endurance():
-    print("\n[STRESS TEST 1] Full Game AI vs AI Endurance Test (Depth 5)")
-    print("-" * 70)
-    tracemalloc.start()
-    t_start = time.perf_counter()
+from states import almost_full_boards
+def test_full_game(max_search_depth: int = 5):
+    print("\n[1] Full game stress test")
+    print("-" * 90)
 
     board = Board()
+    first_player = board.player_to_move
+
+    total_nodes = 0
+    total_time = 0
+    total_pruned = 0
+
+    while not board.full:
+        player = board.player_to_move
+
+        start = time.perf_counter()
+        col, tree, stats = best_move(
+            board,
+            k=max_search_depth,
+            maximizer=player
+        )
+        time_elapsed = time.perf_counter() - start
+
+        valid_moves = board.valid_moves(COLUMN_ORDER)
+
+        if col not in valid_moves:
+            raise ValueError(
+                f"Invalid move: {col}, "
+                f"valid moves: {valid_moves}, "
+                f"depth: {max_search_depth}"
+            )
+
+        board.make_move(col)
+
+        total_nodes += stats.nodes
+        total_time += time_elapsed
+        total_pruned += stats.cutoffs
+
+    print(f"Moves played         : {board.moves}/{CELLS}")
+    print(f"Total expanded nodes : {total_nodes:,}")
+    print(f"Total cutoffs        : {total_pruned:,}")
+    print(f"Total time           : {total_time:.2f}s")
+    print(f"Average move         : {total_time / board.moves * 1000:.2f}ms")
+
+    print(f"First player score   : {board.count_fours(first_player)}")
+    print(f"Second player score  : {board.count_fours(1-first_player)}")
+
+    for row in board.to_grid():
+        print(row)
+
+    print("[PASSED]")
+# for d in range(1,10):
+#     print(f"Current depth : {d}")
+#     test_full_game(d)
+
+def test_nearly_full_board(max_search_depth: int = 5):
+
+    print(f"\n[2] Nearly full board stress test | Depth {max_search_depth}")
+    print("-" * 110)
+
+    move_counts = [20 ,36, 38, 40, 41]
+
     total_nodes = 0
     total_cutoffs = 0
-    move_times = []
+    total_time = 0
 
-    move_num = 1
-    while not board.full:
-        cur_player = board.player_to_move
-        t0 = time.perf_counter()
-        col, tree, stats = best_move(board, k=5, maximizer=cur_player)
-        t_move = time.perf_counter() - t0
+    passed = 0
+    invalid = 0
 
-        move_times.append(t_move)
-        total_nodes += stats.nodes
-        total_cutoffs += stats.cutoffs
+    for i, sequence in enumerate(almost_full_boards):
 
-        assert col in board.valid_moves(COLUMN_ORDER), f"Invalid move {col} at move {move_num}"
-        board.make_move(col)
+        for move_count in move_counts:
 
-        if move_num % 7 == 0 or board.full:
-            print(
-                f"  Move {move_num:>2}/42: Col {col} | Nodes: {stats.nodes:>6,d} | "
-                f"Cutoffs: {stats.cutoffs:>5,d} | Latency: {t_move*1000:>6.1f}ms"
+            board = Board()
+
+            # Reconstruct the position.
+            valid_position = True
+
+            for col in sequence[:move_count]:
+
+                valid_moves = board.valid_moves(COLUMN_ORDER)
+
+                if col not in valid_moves:
+                    print(
+                        f"Board {i + 1:02} | "
+                        f"Moves {move_count} | INVALID POSITION"
+                    )
+                    invalid += 1
+                    valid_position = False
+                    break
+
+                board.make_move(col)
+
+            if not valid_position:
+                continue
+
+            valid_moves = board.valid_moves(COLUMN_ORDER)
+
+            if not valid_moves:
+                print(f"Board {i + 1:02} | No legal moves")
+                invalid += 1
+                continue
+
+            moves_before = board.moves
+
+            # Search.
+            start = time.perf_counter()
+
+            col, tree, stats = best_move(
+                board,
+                k=max_search_depth,
+                maximizer=board.player_to_move
             )
-        move_num += 1
 
-    t_total = time.perf_counter() - t_start
-    current_mem, peak_mem = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
+            elapsed = time.perf_counter() - start
 
-    p0_score = count_fours(board.bb[0])
-    p1_score = count_fours(board.bb[1])
+            # Validate the result.
+            if board.moves != moves_before:
+                raise RuntimeError("Search modified the original board!")
 
-    print("-" * 70)
-    print(f"  Result: Player 0 ({p0_score}) vs Player 1 ({p1_score}) | Moves: {board.moves}/{CELLS}")
-    print(f"  Total Nodes Expanded: {total_nodes:,d}")
-    print(f"  Total Cutoffs:        {total_cutoffs:,d}")
-    print(f"  Avg Latency / Move:   {sum(move_times)/len(move_times)*1000:.2f} ms")
-    print(f"  Max Latency / Move:   {max(move_times)*1000:.2f} ms")
-    print(f"  Total Match Time:     {t_total:.2f} s")
-    print(f"  Peak Memory:          {peak_mem / 1024:.1f} KB")
-    print("  STATUS: [PASSED - STABLE & DETERMINISTIC]")
+            if col not in valid_moves:
+                raise ValueError(
+                    f"Invalid AI move {col} "
+                    f"on board {i + 1}"
+                )
 
+            total_nodes += stats.nodes
+            total_cutoffs += stats.cutoffs
+            total_time += elapsed
 
-def stress_test_deep_lookahead():
-    print("\n[STRESS TEST 2] Deep Lookahead Scaling & Recursion Limits (k=6, 7, 8)")
-    print("-" * 70)
-    # Balanced midgame board (8 moves)
+            passed += 1
+
+            print(
+                f"Board {i + 1:02} | "
+                f"Moves {move_count:02} | "
+                f"Nodes {stats.nodes:>9,} | "
+                f"Cutoffs {stats.cutoffs:>8,} | "
+                f"Time {elapsed * 1000:>9.3f} ms"
+            )
+
+    print("\nSUMMARY")
+    print("-" * 90)
+
+    print(f"Passed positions : {passed}")
+    print(f"Invalid positions: {invalid}")
+
+    if passed == 0:
+        return
+
+    print(f"Total nodes      : {total_nodes:,}")
+    print(f"Total cutoffs    : {total_cutoffs:,}")
+    print(f"Total time       : {total_time:.3f}s")
+
+    print(f"Average nodes    : {total_nodes / passed:,.2f}")
+    print(f"Average cutoffs  : {total_cutoffs / passed:,.2f}")
+    print(f"Average time     : {total_time / passed * 1000:.3f}ms")
+
+    if total_nodes:
+        print(
+            f"Cutoff rate      : "
+            f"{total_cutoffs / total_nodes * 100:.2f}%"
+        )
+
+def ai_vs_ai_smart_vs_stupid(smart_depth:int,stupid_depth:int):
+    print("\n[3] Full game stress test with smart agent vs stupid agent")
+    print("-" * 90)
+
     board = Board()
-    for col in [3, 3, 2, 4, 3, 2, 4, 1]:
+    first_player = board.player_to_move
+
+    total_nodes = 0
+    total_time = 0
+    total_pruned = 0
+
+    while not board.full:
+        player = board.player_to_move
+
+        start = time.perf_counter()
+        depth =  smart_depth if player == 0 else stupid_depth
+        col, tree, stats = best_move(
+            board,
+            k=depth,
+            maximizer=player
+        )
+        time_elapsed = time.perf_counter() - start
+
+        valid_moves = board.valid_moves(COLUMN_ORDER)
+
+        if col not in valid_moves:
+            raise ValueError(
+                f"Invalid move: {col}, "
+                f"valid moves: {valid_moves}, "
+                f"depth: {depth}"
+            )
+
         board.make_move(col)
 
-    for depth in [6, 7, 8]:
-        tracemalloc.start()
-        t0 = time.perf_counter()
-        col, tree, stats = best_move(board, k=depth, maximizer=board.player_to_move)
-        dur = time.perf_counter() - t0
-        _, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
+        total_nodes += stats.nodes
+        total_time += time_elapsed
+        total_pruned += stats.cutoffs
 
-        nps = stats.nodes / dur if dur > 0 else 0
-        print(
-            f"  Depth k={depth}: Best Move={col} | Nodes={stats.nodes:>9,d} | "
-            f"Leaves={stats.leaves:>9,d} | Cutoffs={stats.cutoffs:>7,d} | "
-            f"Time={dur:>6.2f}s | Throughput={nps:>10,.0f} n/s | Peak Mem={peak/1024:>6.1f}KB"
-        )
-    print("  STATUS: [PASSED - NO OVERFLOW OR LEAK]")
+    print(f"Moves played         : {board.moves}/{CELLS}")
+    print(f"Total expanded nodes : {total_nodes:,}")
+    print(f"Total cutoffs        : {total_pruned:,}")
+    print(f"Total time           : {total_time:.2f}s")
+    print(f"Average move         : {total_time / board.moves * 1000:.2f}ms")
 
+    print(f"First player score   : {board.count_fours(first_player)}")
+    print(f"Second player score  : {board.count_fours(1-first_player)}")
 
-def stress_test_boundary_conditions():
-    print("\n[STRESS TEST 3] Boundary Conditions & Edge Case Boards")
-    print("-" * 70)
+    for row in board.to_grid():
+        print(row)
 
-    # 1. Nearly full board (41 moves played, 1 slot left)
-    b_nearly_full = Board()
-    # Fill all columns 0 to 5 completely (6*6 = 36 moves), and col 6 with 5 moves (36+5 = 41 moves)
-    for c in range(6):
-        for _ in range(6):
-            b_nearly_full.make_move(c)
-    for _ in range(5):
-        b_nearly_full.make_move(6)
+    print("[PASSED]")
+for d in range(1,9):
+    test_nearly_full_board(d)
 
-    assert b_nearly_full.moves == 41
-    assert b_nearly_full.valid_moves(COLUMN_ORDER) == [6]
-
-    t0 = time.perf_counter()
-    col, tree, stats = best_move(b_nearly_full, k=5, maximizer=b_nearly_full.player_to_move)
-    t_end = time.perf_counter() - t0
-    assert col == 6, f"Expected move 6, got {col}"
-    print(f"  Test 3.1 (1 Slot Remaining): Played Col {col} in {t_end*1000:.3f}ms [PASSED]")
-
-    # 2. Defensive block of immediate opponent 3-in-a-row
-    b_block = Board()
-    # Player 0 plays col 0, 1, 2 at row 0 (3-in-a-row threat at col 3)
-    b_block.make_move(0) # P0 at (0, 0)
-    b_block.make_move(0) # P1 at (0, 1)
-    b_block.make_move(1) # P0 at (1, 0)
-    b_block.make_move(1) # P1 at (1, 1)
-    b_block.make_move(2) # P0 at (2, 0) -> threat: (3, 0) gives P0 four-in-a-row!
-    # Now it is P1's turn. P1 must block by playing col 3!
-    assert b_block.player_to_move == 1
-    col, tree, stats = best_move(b_block, k=4, maximizer=1)
-    print(f"  Test 3.2 (Defensive Block): P1 chose Col {col} to block P0 threat at col 3 (P1 chose: {col})")
-    assert col == 3, f"Expected P1 to block at col 3, got {col}"
-    print("  STATUS: [PASSED - THREAT ACCURATELY BLOCKED]")
-
-
-def stress_test_rapid_burst():
-    print("\n[STRESS TEST 4] Rapid Fire Search Burst (200 Sequential Requests)")
-    print("-" * 70)
-    board = Board()
-    board.make_move(3)
-    board.make_move(3)
-
-    t0 = time.perf_counter()
-    for _ in range(200):
-        col, _, _ = best_move(board, k=3, maximizer=board.player_to_move)
-    dur = time.perf_counter() - t0
-
-    req_per_sec = 200 / dur
-    print(f"  Executed 200 searches at k=3 in {dur:.2f}s ({req_per_sec:.1f} req/s)")
-    print("  STATUS: [PASSED - 0 ERRORS UNDER RAPID BURST]")
-
-
-def run_all_stress_tests():
-    print("=" * 80)
-    print("          ALPHA-BETA PRUNING STRESS TEST & RELIABILITY SUITE")
-    print("=" * 80)
-    stress_test_full_game_endurance()
-    stress_test_deep_lookahead()
-    stress_test_boundary_conditions()
-    stress_test_rapid_burst()
-    print("\n" + "=" * 80)
-    print("                 ALL STRESS TESTS COMPLETED SUCCESSFULLY")
-    print("=" * 80)
-
-
-if __name__ == "__main__":
-    run_all_stress_tests()
+for d1 , d2 in [(7,1),(6,3),(5,2),(4,3),(9,4),(10,9),(9,7)]:
+    ai_vs_ai_smart_vs_stupid(d1,d2)
