@@ -360,33 +360,38 @@ function App() {
 
               <div className="field-group field-group--depth">
                 <div className="field-heading">
-                  <label htmlFor="depth-slider">AI Search Depth</label>
+                  <label htmlFor="depth-input">AI Search Depth (K)</label>
                 </div>
-                <div className="depth-display">
-                  <strong>{searchDepth}</strong>
-                  <div>
-                    <span>PLY {searchDepth}</span>
-                    <small>
-                      {searchDepth <= 3 ? 'Fast · Reactive' : searchDepth <= 6 ? 'Balanced · Deep pruning' : 'Exhaustive · Deep lookahead'}
-                    </small>
-                  </div>
-                  <BrainCircuit size={28} strokeWidth={1.5} />
+                <div className="depth-input-row">
+                  <BrainCircuit size={22} strokeWidth={1.5} className="depth-input-icon" />
+                  <input
+                    id="depth-input"
+                    type="number"
+                    min="1"
+                    value={searchDepth}
+                    onChange={(event) => {
+                      const raw = event.target.value;
+                      if (raw === '') { setSearchDepth(0); return; }
+                      const n = parseInt(raw, 10);
+                      if (!isNaN(n)) setSearchDepth(n);
+                    }}
+                    onBlur={() => {
+                      if (searchDepth < 1) setSearchDepth(1);
+                    }}
+                    aria-label="AI search depth"
+                    aria-describedby="depth-hint"
+                    placeholder="e.g. 5"
+                  />
                 </div>
-                <input
-                  id="depth-slider"
-                  type="range"
-                  min="1"
-                  max="9"
-                  step="1"
-                  value={searchDepth}
-                  onChange={(event) => setSearchDepth(Number(event.target.value))}
-                  aria-label={`Search depth ${searchDepth}`}
-                />
-                <div className="range-labels">
-                  <span>1 (Fast)</span>
-                  <span>5 (Balanced)</span>
-                  <span>9 (Deep)</span>
-                </div>
+                <p id="depth-hint" className="depth-hint">
+                  {searchDepth < 1
+                    ? 'Must be at least 1.'
+                    : searchDepth <= 3
+                      ? `K=${searchDepth} — Fast · Reactive`
+                      : searchDepth <= 6
+                        ? `K=${searchDepth} — Balanced · Deep pruning`
+                        : `K=${searchDepth} — Exhaustive · Deep lookahead`}
+                </p>
               </div>
 
               {error && (
