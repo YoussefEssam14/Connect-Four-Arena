@@ -335,6 +335,9 @@ button, input, select {
   letter-spacing: 0.5px;
   min-height: 1.2em;
 }
+.depth-hint--error {
+  color: var(--red-bright);
+}
 
 .start-button {
   position: relative;

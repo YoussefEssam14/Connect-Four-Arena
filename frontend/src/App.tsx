@@ -71,7 +71,7 @@ type Screen = 'home' | 'game';
 type GameTab = 'board' | 'case' | 'tree';
 
 const DEFAULT_ORIGIN = import.meta.env.VITE_API_ORIGIN ?? 'http://localhost:8000';
-const MAX_SEARCH_DEPTH = 9;
+const MAX_SEARCH_DEPTH = 12;
 const TREE_DEPTH_DEFAULT = 3;
 
 async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
@@ -368,6 +368,7 @@ function App() {
                     id="depth-input"
                     type="number"
                     min="1"
+                    max="12"
                     value={searchDepth}
                     onChange={(event) => {
                       const raw = event.target.value;
@@ -377,20 +378,25 @@ function App() {
                     }}
                     onBlur={() => {
                       if (searchDepth < 1) setSearchDepth(1);
+                      if (searchDepth > 12) setSearchDepth(12);
                     }}
                     aria-label="AI search depth"
                     aria-describedby="depth-hint"
                     placeholder="e.g. 5"
                   />
                 </div>
-                <p id="depth-hint" className="depth-hint">
+                <p id="depth-hint" className={`depth-hint${searchDepth < 1 || searchDepth > 12 ? ' depth-hint--error' : ''}`}>
                   {searchDepth < 1
-                    ? 'Must be at least 1.'
-                    : searchDepth <= 3
-                      ? `K=${searchDepth} — Fast · Reactive`
-                      : searchDepth <= 6
-                        ? `K=${searchDepth} — Balanced · Deep pruning`
-                        : `K=${searchDepth} — Exhaustive · Deep lookahead`}
+                    ? '⚠ Depth must be at least 1.'
+                    : searchDepth > 12
+                      ? '⚠ Maximum allowed depth is 12. Values above this will be rejected.'
+                      : searchDepth <= 3
+                        ? `K=${searchDepth} — Fast · Reactive`
+                        : searchDepth <= 6
+                          ? `K=${searchDepth} — Balanced · Deep pruning`
+                          : searchDepth <= 9
+                            ? `K=${searchDepth} — Exhaustive · Deep lookahead`
+                            : `K=${searchDepth} — ⚠ Very slow. Expect minutes per move.`}
                 </p>
               </div>
 
