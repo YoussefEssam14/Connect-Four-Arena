@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Activity,
+  AlertTriangle,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -9,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   CircleHelp,
+  Clock,
   Cpu,
   Eye,
   FileText,
@@ -350,7 +352,7 @@ function App() {
                       <span className={`disc disc--${color}`}><span /></span>
                       <span className="color-option__copy">
                         <strong>{color === 'R' ? 'Light Yagami' : 'L Lawliet'}</strong>
-                        <small>{color === 'R' ? 'Red · Moves first' : 'Yellow · AI moves first'}</small>
+                        <small>{color === 'R' ? 'Red — Moves first' : 'Yellow — AI moves first'}</small>
                       </span>
                       {humanColor === color && <Check className="color-option__check" size={20} />}
                     </button>
@@ -385,19 +387,24 @@ function App() {
                     placeholder="e.g. 5"
                   />
                 </div>
-                <p id="depth-hint" className={`depth-hint${searchDepth < 1 || searchDepth > 12 ? ' depth-hint--error' : ''}`}>
-                  {searchDepth < 1
-                    ? '⚠ Depth must be at least 1.'
-                    : searchDepth > 12
-                      ? '⚠ Maximum allowed depth is 12. Values above this will be rejected.'
-                      : searchDepth <= 3
-                        ? `K=${searchDepth} — Fast · Reactive`
-                        : searchDepth <= 6
-                          ? `K=${searchDepth} — Balanced · Deep pruning`
-                          : searchDepth <= 9
-                            ? `K=${searchDepth} — Exhaustive · Deep lookahead`
-                            : `K=${searchDepth} — ⚠ Very slow. Expect minutes per move.`}
-                </p>
+                <div
+                  id="depth-hint"
+                  className={`depth-hint${searchDepth < 1 || searchDepth > 12 ? ' depth-hint--error' : searchDepth >= 10 ? ' depth-hint--warn' : ''}`}
+                >
+                  {searchDepth < 1 ? (
+                    <><AlertTriangle size={13} /><span>Depth must be at least 1.</span></>
+                  ) : searchDepth > 12 ? (
+                    <><AlertTriangle size={13} /><span>Maximum allowed depth is 12. Values above this will be rejected.</span></>
+                  ) : searchDepth <= 3 ? (
+                    <span>K={searchDepth} — Fast, reactive</span>
+                  ) : searchDepth <= 6 ? (
+                    <span>K={searchDepth} — Balanced, deep pruning</span>
+                  ) : searchDepth <= 9 ? (
+                    <span>K={searchDepth} — Exhaustive, deep lookahead</span>
+                  ) : (
+                    <><Clock size={13} /><span>K={searchDepth} — Very slow. Expect minutes per move.</span></>
+                  )}
+                </div>
               </div>
 
               {error && (
