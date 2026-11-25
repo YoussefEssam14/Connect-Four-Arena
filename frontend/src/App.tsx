@@ -485,29 +485,46 @@ function App() {
             </div>
           )}
 
+          {/* Character background images - shown on all tabs */}
+          <div className="character-backdrop character-backdrop--human">
+            <img 
+              src="/images/player-strategist.webp" 
+              alt="Human strategist"
+              className={`character-image character-image--human${game?.is_human_turn && !gameFinished ? ' is-active' : ''}`}
+            />
+          </div>
+          <div className="character-backdrop character-backdrop--ai">
+            <img 
+              src="/images/minimax-opponent.webp" 
+              alt="AI opponent"
+              className={`character-image character-image--ai${!game?.is_human_turn && !gameFinished ? ' is-active' : ''}`}
+            />
+          </div>
+
           {tab === 'board' ? (
-            <div className="match-layout">
-              <PlayerPanel
-                side="human"
-                color={effectiveHumanColor}
-                active={Boolean(game?.is_human_turn && !gameFinished)}
-                finished={gameFinished}
-                score={game?.human_score ?? 0}
-              />
+            <>
+              <div className="match-layout">
+                <PlayerPanel
+                  side="human"
+                  color={effectiveHumanColor}
+                  active={Boolean(game?.is_human_turn && !gameFinished)}
+                  finished={gameFinished}
+                  score={game?.human_score ?? 0}
+                />
 
-              <section className="board-column-wrap">
-                <div className="board-meta">
-                  <span><span className="live-dot" /> LIVE MATCH</span>
-                  <span>{game?.ai_column !== null && game?.ai_column !== undefined ? `AI Played: Col ${String.fromCharCode(65 + game.ai_column)} (${game.ai_column + 1})` : ''}　 Depth: {game?.k ?? searchDepth}</span>
-                </div>
-
-                <div className="board-shell">
-                  <div className="board-labels">
-                    <span>{gameFinished ? 'MATCH OVER' : game?.is_human_turn ? 'CLICK A COLUMN TO DROP' : 'AI IS THINKING...'}</span>
+                <section className="board-column-wrap">
+                  <div className="board-meta">
+                    <span><span className="live-dot" /> LIVE MATCH</span>
+                    <span>{game?.ai_column !== null && game?.ai_column !== undefined ? `AI Played: Col ${String.fromCharCode(65 + game.ai_column)} (${game.ai_column + 1})` : ''}　 Depth: {game?.k ?? searchDepth}</span>
                   </div>
 
-                  <div className="board-grid" role="group" aria-label="Connect Four game board">
-                    {Array.from({ length: 7 }, (_, column) => {
+                  <div className="board-shell">
+                    <div className="board-labels">
+                      <span>{gameFinished ? 'MATCH OVER' : game?.is_human_turn ? 'CLICK A COLUMN TO DROP' : 'AI IS THINKING...'}</span>
+                    </div>
+
+                    <div className="board-grid" role="group" aria-label="Connect Four game board">
+                      {Array.from({ length: 7 }, (_, column) => {
                       let pieceCount = 0;
                       for (let r = 0; r < 6; r++) {
                         if (isPiece(game?.grid?.[r]?.[column])) pieceCount += 1;
@@ -580,7 +597,8 @@ function App() {
                 <StatItem label="CUTOFFS" value={game?.stats?.cutoffs?.toLocaleString() ?? '—'} />
                 <StatItem label="TIME" value={game?.stats ? `${(game.stats.time * 1000).toFixed(1)} ms` : '—'} />
               </section>
-            </div>
+              </div>
+            </>
           ) : tab === 'case' ? (
             <CaseFileView
               replay={replay}
@@ -721,11 +739,6 @@ function PlayerPanel({
         <span className="micro-label">{isAi ? 'AI' : 'YOU'}</span>
         <span className="player-panel__mark">{isAi ? <Cpu size={20} /> : <Eye size={20} />}</span>
       </div>
-      <img
-        className="player-portrait"
-        src={isAi ? '/images/minimax-opponent.webp' : '/images/player-strategist.webp'}
-        alt={isAi ? 'Minimax AI opponent' : 'Human strategist'}
-      />
       <div className="player-panel__identity">
         <h3>{character}</h3>
         <span>{isAi ? 'MINIMAX' : 'HUMAN'}</span>

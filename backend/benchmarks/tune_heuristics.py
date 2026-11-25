@@ -113,7 +113,7 @@ def evaluate_custom(
 
             score += sign * val
 
-        else:
+        elif k == 2:
 
             score += sign * p.TWO
 

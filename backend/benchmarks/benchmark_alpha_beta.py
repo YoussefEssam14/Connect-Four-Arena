@@ -97,7 +97,7 @@ def run():
     )
 
 
-    for depth in range(1,8):
+    for depth in range(1,12):
         mm_stats = Stats()
 
         start = time.perf_counter()

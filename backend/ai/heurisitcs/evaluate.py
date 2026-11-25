@@ -61,7 +61,7 @@ def evaluate(board: Board, maximizer: int, include_info: bool = True) -> tuple[f
 
             score += sign * val
 
-        else:
+        elif k == 2:
             twos[owner] += 1
             score += sign * TWO
 
