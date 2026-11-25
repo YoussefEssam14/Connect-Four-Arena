@@ -128,6 +128,7 @@ function isFinishedState(state: GameState) {
 const displayValue = (value: unknown) => {
   if (value === null || value === undefined) return '—';
   if (typeof value === 'object') return JSON.stringify(value);
+  if (typeof value === 'number' && isFinite(value)) return value.toFixed(3);
   return String(value);
 };
 
@@ -581,14 +582,18 @@ function App() {
                 </div>
                 <label className="tree-depth-select">
                   <span>TREE DEPTH</span>
-                  <select value={treeDepth} onChange={(event) => void loadTree(Number(event.target.value))}>
-                    {Array.from({ length: Math.min(game?.k ?? MAX_SEARCH_DEPTH, MAX_SEARCH_DEPTH) + 1 }, (_, depth) => (
-                      <option value={depth} key={depth}>
-                        Level {depth} {depth === 0 ? '(Root)' : depth === Math.min(game?.k ?? MAX_SEARCH_DEPTH, MAX_SEARCH_DEPTH) ? `(Max depth ${depth})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={16} />
+                  <input
+                    type="number"
+                    min="0"
+                    max={game?.k ?? MAX_SEARCH_DEPTH}
+                    value={treeDepth}
+                    onChange={(event) => {
+                      const max = game?.k ?? MAX_SEARCH_DEPTH;
+                      const val = Math.max(0, Math.min(Number(event.target.value), max));
+                      void loadTree(val);
+                    }}
+                    aria-label="Tree display depth"
+                  />
                 </label>
               </div>
 
