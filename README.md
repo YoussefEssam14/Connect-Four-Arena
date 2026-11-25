@@ -222,7 +222,6 @@ Contains `hard_states` (20 mid-game move sequences) and `almost_full_boards`
 - **Death Note dark theme** — black/deep-navy backgrounds, blood-red accents (`#ff4444`), gold highlights (`#d4af37`).
 - **Dynamic AI thinking delay** — the spinner stays visible for exactly as long as the backend calculation takes (minimum 400 ms so the animation is visible); K = 1 disappears almost instantly, K = 5 stays for the full search duration.
 - **Depth-aware messages** — "Analyzing board…" at K = 1, "Traversing game tree…" at K = 5.
-- **Web Audio sound effects** — eerie 110 Hz thinking hum, 880 Hz click on piece placement, different tones for victory and defeat. Generated with the Web Audio API (no audio files).
 - **Scrollable minimax tree** — the tree panel scrolls both horizontally and vertically; `max_depth` for the tree request is capped by `MAX_SEARCH_DEPTH` from `settings.py` (not a hard-coded 6).
 - **AI stats panel** — nodes explored, leaves evaluated, alpha-beta cutoffs, and wall-clock time shown after every AI move.
 
